@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.next/
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Secrets
+*.pem
+*.key
+secrets/
+.cxt-session*
+
+# Fetched CXT case data (contains customer PII)
+cases.json
+cases.csv
+kb.json
+kb.csv
+kb-full.json

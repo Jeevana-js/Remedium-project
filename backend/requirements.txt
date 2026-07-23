@@ -1,0 +1,28 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic>=2.7.4
+pydantic-settings
+email-validator
+
+# LangGraph / LangChain
+langgraph
+langchain
+langchain-openai
+
+# LLM client (Groq, OpenAI-compatible)
+openai
+groq
+
+# Security
+cryptography
+
+# HTTP
+httpx
+
+# Utilities
+structlog
+tenacity
+numpy
+scikit-learn
+sentence-transformers

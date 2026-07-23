@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Jeevana Sakthi",
+    "email": "jeevana@aptean.com",
+    "password_hash": "35ea677be1949a3b65fdc091eda2e103e8ff07ab06d2df43e0d85222a861461b"
+  },
+  {
+    "name": "Admin",
+    "email": "admin@aptean.com",
+    "password_hash": "e67be172481cb202aa34477da0bc027702a8ae17b13e1d5f4e4beb20c9fb9765"
+  },
+  {
+    "name": "Test User",
+    "email": "test@aptean.com",
+    "password_hash": "849f1575ccfbf3a4d6cf00e6c5641b7fd4da2ed3e212c2d79ba9161a5a432ff0"
+  },
+  {
+    "name": "Jeevana Sakthi",
+    "email": "jeevanasakthi@aptean.com",
+    "password_hash": "4bc872ec40dec3e19df3d13c36dfe672e50b899a281508d5a55eff1c472957e0"
+  }
+]
