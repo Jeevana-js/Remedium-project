@@ -16,7 +16,7 @@ import structlog
 log = structlog.get_logger()
 
 CLAUDE_BIN = "claude"
-DEFAULT_TIMEOUT_SECONDS = 120
+DEFAULT_TIMEOUT_SECONDS = 180
 DEFAULT_MODEL = "sonnet"
 
 
@@ -42,9 +42,19 @@ async def run_claude_cli(prompt: str, timeout: int = DEFAULT_TIMEOUT_SECONDS) ->
             "--output-format", "json",
             "--permission-mode", "plan",
             "--model", DEFAULT_MODEL,
+            # Ignore any MCP servers configured in the mounted ~/.claude.json
+            # (e.g. the host's stdio "smartwindowsaccess" server, whose local
+            # command doesn't exist in this container). Loading it made plan-mode
+            # runs stall past the timeout; an empty strict config keeps this a
+            # fast single-turn text call (~40s instead of >120s).
+            "--strict-mcp-config",
+            "--mcp-config", '{"mcpServers":{}}',
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            # Draft from an empty dir, not /app, so the agent doesn't wander into
+            # the backend source while analysing the case.
+            cwd="/tmp",
         )
     except FileNotFoundError as exc:
         raise ClaudeCliError(

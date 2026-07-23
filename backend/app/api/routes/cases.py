@@ -131,6 +131,14 @@ async def approve_case(case_id: str, approval: CaseApproval):
         case.status = CaseStatus.APPROVED
     elif approval.action == ApprovalAction.ESCALATE:
         case.status = CaseStatus.ESCALATED
+    elif approval.action == ApprovalAction.REVOKE:
+        # Undo a prior approval: send the case back to the review queue. The
+        # packet is kept intact so it can be re-reviewed and re-approved. Any
+        # side effects already produced (ADO work item, generated test) are left
+        # as-is — this only reopens the human approval gate.
+        if state is not None:
+            state["approved"] = False
+        case.status = CaseStatus.PENDING_APPROVAL
 
     cases_db.save_case(case)
 

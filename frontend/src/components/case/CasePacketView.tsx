@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Case, CasePacket, KBArticle } from "../../types";
 import ConfidenceBadge from "../ui/ConfidenceBadge";
 import ReactMarkdown from "react-markdown";
-import { CheckCircle, XCircle, Edit2, AlertTriangle, FlaskConical, Save, Search } from "lucide-react";
+import { CheckCircle, XCircle, Edit2, AlertTriangle, FlaskConical, Save, Search, RotateCcw } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -31,13 +31,20 @@ export default function CasePacketView({ caseData }: Props) {
   });
 
   const approve = useMutation({
-    mutationFn: (action: "approve" | "reject" | "escalate") =>
+    mutationFn: (action: "approve" | "reject" | "escalate" | "revoke") =>
       axios
         .post(`/api/cases/${caseData.id}/approve`, { action })
         .then((r) => r.data as Case),
     onSuccess: (updated, action) => {
       qc.invalidateQueries({ queryKey: ["cases"] });
-      if (action === "approve") {
+      qc.invalidateQueries({ queryKey: ["case", caseData.id] });
+      if (action === "revoke") {
+        showToast({
+          kind: "info",
+          title: "Approval revoked",
+          description: "The case is back in review — approve, edit, or escalate it again.",
+        });
+      } else if (action === "approve") {
         const kbCount = allArticles.length;
         const parts: string[] = [`Checked against ${kbCount} KB article${kbCount === 1 ? "" : "s"}, no match found.`];
         if (updated.packet?.regression_test_snippet) parts.push("Regression test generated.");
@@ -303,13 +310,6 @@ export default function CasePacketView({ caseData }: Props) {
           </div>
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => approve.mutate("approve")}
-              disabled={approve.isPending}
-              className="btn-primary bg-emerald-600 hover:bg-emerald-700"
-            >
-              <CheckCircle size={14} /> {approve.isPending ? "Processing…" : "Approve & Send"}
-            </button>
-            <button
               onClick={() => approve.mutate("reject")}
               disabled={approve.isPending}
               className="btn-ghost text-red-400 hover:bg-red-500/10"
@@ -331,6 +331,22 @@ export default function CasePacketView({ caseData }: Props) {
               <AlertTriangle size={14} /> Escalate
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Revoke — reopen an approved/resolved case for another review */}
+      {(caseData.status === "approved" || caseData.status === "resolved") && !isEditing && (
+        <div className="card border-slate-600/40 flex items-center justify-between gap-3">
+          <p className="text-xs text-slate-400">
+            This case has been {caseData.status}. Revoke to send it back to the review queue.
+          </p>
+          <button
+            onClick={() => approve.mutate("revoke")}
+            disabled={approve.isPending}
+            className="btn-ghost text-amber-400 flex-shrink-0"
+          >
+            <RotateCcw size={14} /> {approve.isPending ? "Revoking…" : "Revoke approval"}
+          </button>
         </div>
       )}
     </div>

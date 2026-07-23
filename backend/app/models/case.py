@@ -88,6 +88,7 @@ class ApprovalAction(str, Enum):
     EDIT = "edit"
     REJECT = "reject"
     ESCALATE = "escalate"
+    REVOKE = "revoke"
 
 
 class CaseApproval(BaseModel):

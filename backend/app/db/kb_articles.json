@@ -19686,5 +19686,39 @@
     "last_reviewed": null,
     "created_at": "2026-07-13T08:41:29.311112",
     "updated_at": "2026-07-13T08:41:29.311116"
+  },
+  "3b5256b9-bbe3-4249-a0d8-fa16f2992ef5": {
+    "id": "3b5256b9-bbe3-4249-a0d8-fa16f2992ef5",
+    "external_id": null,
+    "title": "Resolving Negative Quantity On Hand and Cost in Traverse",
+    "content": "This article provides a step-by-step guide to resolving negative quantity on hand and cost values in Traverse after a physical inventory count. The issue may arise due to incorrect inventory count entries or misconfiguration of the Warehouse Management Module. To resolve the issue, follow these steps: 1. Review the recent physical inventory count entries for accuracy. 2. Verify the Warehouse Management Module configuration for correct cost and quantity calculations. 3. Reconcile any discrepancies found in the inventory count entries and module configuration. By following these steps, engineers can identify and correct the root cause of the issue, preventing future occurrences.",
+    "product": "Inventory - SaaS",
+    "tags": [
+      "Traverse",
+      "Inventory Management",
+      "Warehouse Management Module"
+    ],
+    "health": "healthy",
+    "freshness_score": 1.0,
+    "last_reviewed": null,
+    "created_at": "2026-07-23T09:58:48.795894",
+    "updated_at": "2026-07-23T09:58:48.795896"
+  },
+  "3d57afe8-3638-4870-ab32-78703ccd568b": {
+    "id": "3d57afe8-3638-4870-ab32-78703ccd568b",
+    "external_id": null,
+    "title": "Resolving Negative Quantity On Hand and Cost in Traverse",
+    "content": "This article provides a step-by-step guide to resolving negative quantity on hand and cost values in Traverse after a physical inventory count. The issue may be caused by incorrect inventory count entries or misconfiguration of the Warehouse Management Module. To resolve the issue, review recent physical inventory count entries for accuracy, verify the Warehouse Management Module configuration for correct cost and quantity calculations, and reconcile any discrepancies found.",
+    "product": "Inventory - SaaS",
+    "tags": [
+      "Traverse",
+      "Inventory Management",
+      "Warehouse Management Module"
+    ],
+    "health": "healthy",
+    "freshness_score": 1.0,
+    "last_reviewed": null,
+    "created_at": "2026-07-23T09:58:57.683700",
+    "updated_at": "2026-07-23T09:58:57.683703"
   }
 }

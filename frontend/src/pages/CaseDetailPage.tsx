@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -19,6 +20,28 @@ export default function CaseDetailPage() {
       return status === "analysing" || status === "ingested" || status === "resolving" ? 2000 : false;
     },
   });
+
+  // When a Claude resolution finishes (live resolving → resolved transition),
+  // move straight to TestForge for regression testing, carrying the resolution
+  // as the fix description. Guarding on the previous status means this only
+  // fires on a fresh resolution — not when simply opening an already-resolved
+  // case. TestForge auto-generates the test from this navigation state.
+  const prevStatusRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const curr = caseData?.status;
+    if (prev === "resolving" && curr === "resolved" && caseData?.resolution_output) {
+      navigate("/test-forge", {
+        state: {
+          bug_title: caseData.title,
+          bug_description: caseData.description,
+          fix_description: caseData.resolution_output,
+          case_id: caseData.id,
+        },
+      });
+    }
+    prevStatusRef.current = curr;
+  }, [caseData?.status, caseData?.resolution_output, caseData?.id, caseData?.title, caseData?.description, navigate]);
 
   if (isLoading || !caseData) {
     return <div className="text-slate-400 text-sm">Loading…</div>;
