@@ -219,6 +219,57 @@ async def search_cases_with_session_cookie(
     return all_cases
 
 
+class SyncWebhookNotConfigured(RuntimeError):
+    """Raised when APPCENTRAL_SYNC_WEBHOOK_URL is not set."""
+
+
+async def fetch_tickets_via_sync_webhook(cookie: str) -> list[dict[str, Any]]:
+    """Fetch the current ticket list from the user-configured AppCentral Flow
+    "sync" webhook.
+
+    Despite first appearances, this endpoint is NOT credential-free — it's
+    gated behind the same appcentral-int.aptean.com browser session as every
+    other CXT endpoint (confirmed: calling it from the backend container with
+    no cookie returns 401 "Insufficient Permissions"; it only "worked" earlier
+    when tested by pasting the URL into a browser that already had an active
+    session, whose cookies rode along automatically). It's a plain GET, not a
+    POST. Simpler than search_cases_with_session_cookie() in that it needs no
+    responsibleParty filter or pagination — the Flow already scopes and
+    returns the full list in one shot — but the same ~30 min cookie lifetime
+    applies. Response shape matches /aurora/be/api/cxt/cases/search/'s case
+    list (id, caseNumber, subject, description, account, product, priority,
+    ...), so to_case_ingest_from_search_result() maps it directly.
+    """
+    if not settings.appcentral_sync_webhook_url:
+        raise SyncWebhookNotConfigured(
+            "APPCENTRAL_SYNC_WEBHOOK_URL is not set in .env."
+        )
+
+    headers = {"Accept": "application/json", "Cookie": cookie}
+    async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
+        resp = await client.get(settings.appcentral_sync_webhook_url)
+        if resp.status_code in (401, 403):
+            raise InvalidCxtSession(
+                "AppCentral rejected the session cookie (expired or invalid). Capture a "
+                "fresh one from DevTools and try again."
+            )
+        if not resp.is_success:
+            log.warning("appcentral.sync_webhook.failed", status=resp.status_code)
+            resp.raise_for_status()
+        data = resp.json()
+
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        # Tolerate a wrapped shape ({"data": [...]} / {"cases": [...]}) in case
+        # the Flow's response format changes.
+        for key in ("data", "cases", "results"):
+            if isinstance(data.get(key), list):
+                return data[key]
+    log.warning("appcentral.sync_webhook.unexpected_shape", shape=type(data).__name__)
+    return []
+
+
 def to_case_ingest_from_search_result(cxt_case: dict[str, Any]) -> CaseIngest:
     """Map a case from the /cxt/cases/search/ response shape (camelCase fields,
     distinct from the Salesforce-shaped /cxt/cases/{id}/ detail response that

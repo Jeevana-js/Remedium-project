@@ -31,7 +31,7 @@ export default function CasesPage() {
   });
 
   return (
-    <div className="space-y-5 max-w-5xl">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Resolve</h1>
@@ -45,14 +45,14 @@ export default function CasesPage() {
             onClick={() => setFormMode((m) => (m === "fetch" ? "none" : "fetch"))}
           >
             <Zap size={14} />
-            {formMode === "fetch" ? "Cancel" : "Fetch Ticket"}
+            {formMode === "fetch" ? "Cancel" : "Fetch All New Tickets"}
           </button>
         </div>
       </div>
 
       {formMode === "fetch" && (
         <AppCentralTicketForm
-          defaultMode="fetch-all"
+          defaultMode="sync"
           onCreated={(c) => { setFormMode("none"); navigate(`/cases/${c.id}`); }}
         />
       )}

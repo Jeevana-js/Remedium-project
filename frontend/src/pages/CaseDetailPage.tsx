@@ -22,33 +22,25 @@ export default function CaseDetailPage() {
   });
 
   // When a Claude resolution finishes (live resolving → resolved transition),
-  // move straight to TestForge for regression testing, carrying the resolution
-  // as the fix description. Guarding on the previous status means this only
-  // fires on a fresh resolution — not when simply opening an already-resolved
-  // case. TestForge auto-generates the test from this navigation state.
+  // move straight to TestForge to auto-generate a regression test from it.
+  // Guarding on the previous status means this only fires on a fresh
+  // resolution — not when simply opening an already-resolved case.
   const prevStatusRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const prev = prevStatusRef.current;
     const curr = caseData?.status;
     if (prev === "resolving" && curr === "resolved" && caseData?.resolution_output) {
-      navigate("/test-forge", {
-        state: {
-          bug_title: caseData.title,
-          bug_description: caseData.description,
-          fix_description: caseData.resolution_output,
-          case_id: caseData.id,
-        },
-      });
+      navigate("/test-forge", { state: { case_id: caseData.id } });
     }
     prevStatusRef.current = curr;
-  }, [caseData?.status, caseData?.resolution_output, caseData?.id, caseData?.title, caseData?.description, navigate]);
+  }, [caseData?.status, caseData?.resolution_output, caseData?.id, navigate]);
 
   if (isLoading || !caseData) {
     return <div className="text-slate-400 text-sm">Loading…</div>;
   }
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate("/cases")} className="btn-ghost py-1.5 px-2">
           <ArrowLeft size={15} /> Back
@@ -97,6 +89,15 @@ export default function CaseDetailPage() {
         <div className="card border-red-500/30 space-y-1">
           <h3 className="text-sm font-semibold text-red-400">Resolution Failed</h3>
           <p className="text-xs text-slate-400">{caseData.resolution_error}</p>
+        </div>
+      )}
+
+      {!caseData.packet && caseData.regression_test_snippet && (
+        <div className="card border-brand-600/30 space-y-2">
+          <h3 className="text-sm font-semibold text-slate-200">Regression Test Generated</h3>
+          <pre className="bg-surface rounded-lg p-4 text-xs text-emerald-300 font-mono overflow-auto max-h-80">
+            {caseData.regression_test_snippet}
+          </pre>
         </div>
       )}
 

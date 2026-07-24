@@ -14,8 +14,14 @@ services:
       # CLI subprocess (app/connectors/claude_cli.py) can authenticate without
       # a separate ANTHROPIC_API_KEY. Read-only; every /resolve call runs as
       # this Claude Code identity and consumes from its usage/quota.
-      - ~/.claude/.credentials.json:/root/.claude/.credentials.json:ro
-      - ~/.claude.json:/root/.claude.json:ro
+      #
+      # Absolute Windows path via /mnt/c/... — NOT ~, which under WSL2 resolves
+      # to the Linux home (/home/<user>), not C:\Users\<user>. The real login
+      # lives on the Windows side; using ~ here silently bind-mounts a
+      # nonexistent path, and Docker creates an empty directory instead of
+      # erroring, so the CLI fails with no readable error message.
+      - /mnt/c/Users/jsr/.claude/.credentials.json:/root/.claude/.credentials.json:ro
+      - /mnt/c/Users/jsr/.claude.json:/root/.claude.json:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   frontend:

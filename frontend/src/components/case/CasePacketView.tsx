@@ -261,21 +261,7 @@ export default function CasePacketView({ caseData }: Props) {
         <div className="card border-brand-600/30 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-200">Regression Test Generated</h3>
-            <button
-              onClick={() =>
-                navigate("/test-forge", {
-                  state: {
-                    bug_title: caseData.title,
-                    bug_description: caseData.description,
-                    fix_description: `${packet.diagnosis}\n\nResolution steps:\n${packet.resolution_steps
-                      .map((s, i) => `${i + 1}. ${s}`)
-                      .join("\n")}`,
-                    case_id: caseData.id,
-                  },
-                })
-              }
-              className="btn-ghost text-xs"
-            >
+            <button onClick={() => navigate("/test-forge")} className="btn-ghost text-xs">
               <FlaskConical size={13} /> Open in TestForge
             </button>
           </div>

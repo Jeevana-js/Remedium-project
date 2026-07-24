@@ -7,9 +7,10 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.agents import case_intelligence
+from app.agents import case_intelligence, live_kb, test_forge
 from app.connectors.claude_cli import ClaudeCliError, run_claude_cli
 from app.db import cases as cases_db
+from app.db import kb as kb_db
 from app.models.case import (
     ApprovalAction,
     Case,
@@ -18,6 +19,7 @@ from app.models.case import (
     CaseSource,
     CaseStatus,
 )
+from app.models.test_generation import TestFramework
 from app.orchestrator.graph import OrchestratorState, remedium_graph, run_post_approval
 from app.retrieval.vector_store import search as vector_search
 from app.retrieval.vector_store import upsert as vector_upsert
@@ -42,6 +44,32 @@ async def _index_resolved_case(case: Case) -> None:
             "url": None,
         },
     )
+
+
+async def _draft_and_save_kb_article(
+    *,
+    case_title: str,
+    case_description: str,
+    diagnosis: str,
+    resolution_steps: list[str],
+    product: str | None,
+) -> None:
+    """Draft a KB article from a resolution and persist + index it, so future
+    tickets can match against it. Shared by every path that completes a
+    resolution: Approve & Send, Resolve-with-Claude, and TestForge generation."""
+    try:
+        article = await live_kb.draft_article_for_case(
+            case_title=case_title,
+            case_description=case_description,
+            resolution_steps=resolution_steps,
+            diagnosis=diagnosis,
+            product=product,
+        )
+        kb_db.save_article(article)
+        from app.api.routes.kb import _index_article
+        await _index_article(article)
+    except Exception as exc:
+        log.warning("cases.draft_kb_article.error", error=str(exc))
 
 # Cases persist to disk (see app.db.cases) so they survive backend restarts.
 # Orchestration state is only needed while a case is actively being processed,
@@ -229,14 +257,74 @@ async def resolve_case(case_id: str, background_tasks: BackgroundTasks):
             output = await run_claude_cli(_build_resolution_prompt(case))
             case.resolution_output = output
             case.status = CaseStatus.RESOLVED
+            cases_db.save_case(case)
+            await _draft_and_save_kb_article(
+                case_title=case.title,
+                case_description=case.description,
+                diagnosis=output,
+                resolution_steps=[output],
+                product=case.product,
+            )
         except ClaudeCliError as exc:
             log.error("cases.resolve.claude_cli_error", error=str(exc), case_id=case_id)
             case.resolution_error = str(exc)
             case.status = CaseStatus.ESCALATED
-        finally:
             cases_db.save_case(case)
 
     background_tasks.add_task(_run)
+    return case
+
+
+@router.post("/{case_id}/generate-test", response_model=Case)
+async def generate_test_for_case(case_id: str):
+    """Generate (or regenerate) a regression test from a case's existing
+    resolution — either a structured packet (Groq-based Resolve pipeline) or
+    plain resolution_output (Claude CLI /resolve) — persist it, and draft a
+    KB article documenting the bug + fix + test."""
+    case = _cases.get(case_id)
+    if not case:
+        raise HTTPException(404, "Case not found")
+    if not case.packet and not case.resolution_output:
+        raise HTTPException(400, "Case has no resolution yet")
+
+    if case.packet:
+        diagnosis = case.packet.diagnosis
+        resolution_steps = case.packet.resolution_steps
+    else:
+        diagnosis = case.resolution_output
+        resolution_steps = [case.resolution_output]
+
+    fix_description = (
+        f"{diagnosis}\n\nResolution steps:\n"
+        + "\n".join(f"{i+1}. {s}" for i, s in enumerate(resolution_steps))
+    )
+
+    try:
+        generated = await test_forge.generate_test(
+            bug_title=case.title,
+            bug_description=case.description,
+            fix_description=fix_description,
+            framework=TestFramework.PYTEST,
+            case_id=case_id,
+        )
+    except Exception as exc:
+        log.error("cases.generate_test.error", error=str(exc), case_id=case_id)
+        raise HTTPException(502, f"Test generation failed: {exc}") from exc
+
+    if case.packet:
+        case.packet.regression_test_snippet = generated.test_code
+    else:
+        case.regression_test_snippet = generated.test_code
+    cases_db.save_case(case)
+
+    await _draft_and_save_kb_article(
+        case_title=case.title,
+        case_description=case.description,
+        diagnosis=diagnosis,
+        resolution_steps=resolution_steps,
+        product=case.product,
+    )
+
     return case
 
 

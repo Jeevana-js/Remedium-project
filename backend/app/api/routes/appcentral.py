@@ -6,6 +6,7 @@ service credential is configured — see app.connectors.appcentral_client.
 """
 from __future__ import annotations
 
+import structlog
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -14,15 +15,18 @@ from pydantic import BaseModel
 from app.connectors.appcentral_client import (
     AppCentralNotConfigured,
     InvalidCxtSession,
+    SyncWebhookNotConfigured,
+    fetch_tickets_via_sync_webhook,
     import_case,
     search_cases_with_session_cookie,
     to_case_ingest_from_search_result,
 )
 from app.db import cases as cases_db
-from app.models.case import Case, CaseStatus
+from app.models.case import Case, CaseIngest, CaseStatus
 from app.orchestrator.graph import OrchestratorState, remedium_graph
 
 router = APIRouter()
+log = structlog.get_logger()
 
 
 @router.get("/cases/{case_id}/preview")
@@ -34,12 +38,6 @@ async def preview_case(case_id: str):
         raise HTTPException(503, str(exc)) from exc
 
 
-class FetchNewTicketsRequest(BaseModel):
-    cookie: str
-    responsible_party: list[str]
-    exclude_status: list[str] | None = None
-
-
 class FetchNewTicketsResult(BaseModel):
     fetched: int
     created: int
@@ -47,20 +45,14 @@ class FetchNewTicketsResult(BaseModel):
     created_cases: list[Case]
 
 
-@router.post("/fetch-new", response_model=FetchNewTicketsResult)
-async def fetch_new_tickets(body: FetchNewTicketsRequest, background_tasks: BackgroundTasks):
-    """Pull all matching CXT tickets via a caller-supplied session cookie and
-    ingest any not already present (deduped by external_id/case number)."""
+def _ingest_new_cxt_cases(
+    cxt_cases: list[dict],
+    background_tasks: BackgroundTasks,
+) -> FetchNewTicketsResult:
+    """Shared dedup + ingest + background-analyse logic for any list of raw
+    CXT cases in the /cxt/cases/search/ camelCase shape, regardless of which
+    connector fetched them (sync webhook or session-cookie search)."""
     from app.api.routes.cases import _cases, _states  # shared in-memory case store
-
-    try:
-        cxt_cases = await search_cases_with_session_cookie(
-            cookie=body.cookie,
-            responsible_party=body.responsible_party,
-            exclude_status=body.exclude_status,
-        )
-    except InvalidCxtSession as exc:
-        raise HTTPException(401, str(exc)) from exc
 
     existing_external_ids = {c.external_id for c in _cases.values() if c.external_id}
 
@@ -80,9 +72,7 @@ async def fetch_new_tickets(body: FetchNewTicketsRequest, background_tasks: Back
         if ingest.external_id:
             existing_external_ids.add(ingest.external_id)
 
-        async def _run(case=case, ingest=ingest):
-            import structlog
-            _log = structlog.get_logger()
+        async def _run(case: Case = case, ingest: CaseIngest = ingest):
             try:
                 state: OrchestratorState = {"case": ingest, "case_id": str(case.id), "approved": False}
                 result = await remedium_graph.ainvoke(state)
@@ -97,7 +87,7 @@ async def fetch_new_tickets(body: FetchNewTicketsRequest, background_tasks: Back
                     case.packet = packet
                     case.category = packet.category
             except Exception as exc:
-                _log.error("appcentral.fetch_new.background_task.error", error=str(exc), case_id=str(case.id))
+                log.error("appcentral.fetch_new.background_task.error", error=str(exc), case_id=str(case.id))
                 case.status = CaseStatus.ESCALATED
             finally:
                 cases_db.save_case(case)
@@ -110,3 +100,47 @@ async def fetch_new_tickets(body: FetchNewTicketsRequest, background_tasks: Back
         skipped_existing=skipped,
         created_cases=created_cases,
     )
+
+
+class SyncTicketsRequest(BaseModel):
+    cookie: str
+
+
+@router.post("/sync", response_model=FetchNewTicketsResult)
+async def sync_tickets(body: SyncTicketsRequest, background_tasks: BackgroundTasks):
+    """Pull the current ticket list from the AppCentral sync webhook and
+    ingest any not already present, deduped by case number. Simpler than
+    /fetch-new (no responsible-party filter needed — the webhook already
+    scopes the list), but still needs the same session cookie: the webhook is
+    gated behind the same appcentral-int.aptean.com login as every other CXT
+    endpoint, confirmed via a direct 401 test from the backend container."""
+    try:
+        cxt_cases = await fetch_tickets_via_sync_webhook(cookie=body.cookie)
+    except SyncWebhookNotConfigured as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except InvalidCxtSession as exc:
+        raise HTTPException(401, str(exc)) from exc
+    return _ingest_new_cxt_cases(cxt_cases, background_tasks)
+
+
+class FetchNewTicketsRequest(BaseModel):
+    cookie: str
+    responsible_party: list[str]
+    exclude_status: list[str] | None = None
+
+
+@router.post("/fetch-new", response_model=FetchNewTicketsResult)
+async def fetch_new_tickets(body: FetchNewTicketsRequest, background_tasks: BackgroundTasks):
+    """Pull all matching CXT tickets via a caller-supplied session cookie and
+    ingest any not already present (deduped by external_id/case number).
+    Superseded by /sync where the sync webhook is configured — kept as a
+    fallback for filtering by a specific responsible party."""
+    try:
+        cxt_cases = await search_cases_with_session_cookie(
+            cookie=body.cookie,
+            responsible_party=body.responsible_party,
+            exclude_status=body.exclude_status,
+        )
+    except InvalidCxtSession as exc:
+        raise HTTPException(401, str(exc)) from exc
+    return _ingest_new_cxt_cases(cxt_cases, background_tasks)

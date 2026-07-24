@@ -69,6 +69,10 @@ class Case(BaseModel):
     packet: Optional[CasePacket] = None
     resolution_output: Optional[str] = None
     resolution_error: Optional[str] = None
+    # Mirrors CasePacket.regression_test_snippet for cases with no packet at all
+    # (resolved via the Claude CLI /resolve path, which produces resolution_output
+    # instead of a structured packet) — generate-test writes to whichever exists.
+    regression_test_snippet: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

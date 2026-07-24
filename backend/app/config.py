@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     appcentral_client_secret: str = ""
     appcentral_api_key: str = ""
 
+    # AppCentral "sync" webhook — a user-configured Flow endpoint that returns
+    # the ticket list directly (no session cookie needed). Confirmed working:
+    # POST with no auth/body required, returns a JSON array of CXT cases in
+    # the same shape as /aurora/be/api/cxt/cases/search/'s "cases" results.
+    appcentral_sync_webhook_url: str = ""
+
     # App
     app_env: str = "development"
     secret_key: str = "change-me"

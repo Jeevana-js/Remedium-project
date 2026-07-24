@@ -23,7 +23,7 @@ export default function KBArticleDetailPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate("/live-kb")} className="btn-ghost py-1.5 px-2">
           <ArrowLeft size={15} /> Back

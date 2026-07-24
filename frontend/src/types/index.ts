@@ -51,6 +51,7 @@ export interface Case {
   packet?: CasePacket;
   resolution_output?: string;
   resolution_error?: string;
+  regression_test_snippet?: string;
   created_at: string;
   updated_at: string;
 }

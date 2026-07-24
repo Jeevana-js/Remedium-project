@@ -93,7 +93,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto bg-surface p-6">{children}</main>
+      <main className="flex-1 min-w-0 overflow-auto bg-surface p-6">{children}</main>
 
       <ToastContainer />
     </div>
